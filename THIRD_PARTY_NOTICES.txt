@@ -1,0 +1,12 @@
+Kasey Sim bundles or loads the following third-party components:
+
+- MediaPipe Tasks Vision (pose landmarker, WASM runtime) - Google LLC - Apache License 2.0
+  https://github.com/google-ai-edge/mediapipe
+- RTMPose-L (Halpe-26) model weights - OpenMMLab MMPose - Apache License 2.0
+  https://github.com/open-mmlab/mmpose
+- ONNX Runtime Web - Microsoft - MIT License
+  https://github.com/microsoft/onnxruntime
+- three.js - three.js authors - MIT License
+  https://github.com/mrdoob/three.js
+
+Videos you analyse never leave your device: pose estimation runs locally in the browser.

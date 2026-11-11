@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kasey Sim · 3D Swing Lab</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23f2f4f7'/><circle cx='12' cy='12' r='1.6' fill='%23aab'/><circle cx='18' cy='11' r='1.6' fill='%23aab'/><circle cx='14' cy='18' r='1.6' fill='%23aab'/><circle cx='20' cy='17' r='1.6' fill='%23aab'/></svg>" />
+  <script type="module" crossorigin src="/kasey-sim-app/assets/index-mGe8BBqS.js"></script>
+  <link rel="stylesheet" crossorigin href="/kasey-sim-app/assets/index-WNctn2No.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">◉</span> Kasey Sim <small>3D Swing Lab</small></div>
+    <div class="tb-group">
+      <label class="btn primary" title="Open a swing video (or drop one anywhere)">
+        Open video<input id="fileInput" type="file" accept="video/*" hidden />
+      </label>
+      <select id="clipSelect" title="Kasey's clips (local videos/ folder)"><option value="">Kasey's clips…</option></select>
+      <button class="btn" id="libraryBtn">Library</button>
+    </div>
+    <div class="tb-group" id="calibGroup">
+      <div class="seg" id="viewSeg" title="Where the camera was">
+        <button data-v="face-on">Face-on</button><button data-v="dtl">Down-the-line</button>
+      </div>
+      <div class="seg" id="handSeg" title="Golfer handedness">
+        <button data-v="right">Righty</button><button data-v="left">Lefty</button>
+      </div>
+      <button class="btn ghost" id="autoDetectBtn" title="Guess camera view and handedness from the pose">Auto</button>
+      <label class="slider" title="Smoothing">Smooth <input id="smoothing" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
+    </div>
+    <div class="tb-group">
+      <select id="compareSelect" title="Compare against another saved swing"><option value="">Compare with…</option></select>
+      <div class="dropdown">
+        <button class="btn" id="exportBtn">Export ▾</button>
+        <div class="menu" id="exportMenu">
+          <button data-x="report">Swing report</button>
+          <button data-x="csv">Metrics CSV (per frame)</button>
+          <button data-x="json">Analysis JSON</button>
+          <button data-x="png">3D snapshot PNG</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout" id="layout">
+    <section class="panel video-panel">
+      <div class="panel-head">
+        <span class="title" id="swingName">No swing loaded</span>
+        <button class="btn ghost small hidden" id="reanalyseBtn" title="Run pose detection again on every frame">Re-analyse</button>
+        <div class="tools" id="drawTools">
+          <button data-t="none" class="on" title="Pointer">⭡</button>
+          <button data-t="line" title="Line (shows angle from vertical)">／</button>
+          <button data-t="angle" title="Angle (3 clicks)">∠</button>
+          <button data-t="circle" title="Circle">◯</button>
+          <button data-t="rect" title="Box">▭</button>
+          <button data-t="free" title="Freehand">✎</button>
+          <input type="color" id="drawColor" value="#ffd23f" title="Colour" />
+          <button id="undoDraw" title="Undo (Ctrl+Z)">↶</button>
+          <button id="clearDraw" title="Clear drawings">✕</button>
+        </div>
+      </div>
+      <div class="stages" id="stages">
+        <div class="stage" id="stageMain">
+          <video id="video" playsinline muted preload="auto"></video>
+          <canvas id="overlay"></canvas>
+          <div class="stage-tag">Swing</div>
+        </div>
+        <div class="stage hidden" id="stageCompare">
+          <video id="videoCompare" playsinline muted preload="auto"></video>
+          <canvas id="overlayCompare"></canvas>
+          <div class="stage-tag cmp">Compare</div>
+        </div>
+        <div class="empty" id="emptyState">
+          <div class="empty-card">
+            <h2>Drop a swing video</h2>
+            <p>Any single-camera clip works: a phone video or one of Kasey's Shorts. Face-on or down-the-line, one golfer in frame.</p>
+            <p class="muted">Pose is estimated on-device with MediaPipe. Nothing gets uploaded.</p>
+          </div>
+        </div>
+      </div>
+      <div class="toggles" id="overlayToggles">
+        <label><input type="checkbox" data-o="skeleton" checked /> Skeleton</label>
+        <label><input type="checkbox" data-o="handTrace" checked /> Hand path</label>
+        <label><input type="checkbox" data-o="addressLines" /> Address lines</label>
+        <label><input type="checkbox" data-o="headBox" /> Head box</label>
+      </div>
+    </section>
+
+    <section class="panel viewer-panel">
+      <div class="panel-head">
+        <span class="title">3D</span>
+        <div class="seg small" id="presetSeg">
+          <button data-p="video" title="Same angle and framing as the video">Video</button><button data-p="face-on">Face-on</button><button data-p="dtl">DTL</button><button data-p="top">Top</button><button data-p="trail">Trail</button><button data-p="free">Free</button>
+        </div>
+      </div>
+      <div class="viewer" id="viewer3d"></div>
+      <div class="toggles" id="viewerToggles">
+        <label><input type="checkbox" data-o="showPlanes" checked /> Rotation rings</label>
+        <label><input type="checkbox" data-o="showHandPath" checked /> Hand path</label>
+        <label><input type="checkbox" data-o="showGhosts" /> Ghosts</label>
+        <label><input type="checkbox" data-o="showTrace" /> Head/pelvis trace</label>
+        <label><input type="checkbox" data-o="showGrid" checked /> Grid</label>
+      </div>
+    </section>
+
+    <aside class="panel metrics-panel">
+      <div class="tabs" id="metricTabs">
+        <button data-tab="key" class="on">Key metrics</button>
+        <button data-tab="phases">By position</button>
+        <button data-tab="sequence">Sequence</button>
+      </div>
+      <div class="tab-body" id="tab-key"></div>
+      <div class="tab-body hidden" id="tab-phases"></div>
+      <div class="tab-body hidden" id="tab-sequence">
+        <h4>Tempo</h4>
+        <div id="tempoBar"></div>
+        <h4>Kinematic sequence</h4>
+        <div id="seqSummary" class="seq-summary"></div>
+        <div id="seqChart"></div>
+      </div>
+      <div class="caveat" id="caveat">Single-camera estimate. "≥" means the shoulders are square to the camera, so the turn is at least that much. Values near impact at 30 fps can be off by a frame (about 30° of chest turn). Compare swings filmed from the same angle.</div>
+      <div class="warnings" id="warnings"></div>
+    </aside>
+
+    <section class="panel timeline-panel">
+      <div class="transport">
+        <button class="btn icon" id="prevPhase" title="Previous position ([)">⏮</button>
+        <button class="btn step" id="stepBack" title="Back one frame (← key, or scroll over the video). Hold to repeat.">‹ 1 frame</button>
+        <button class="btn icon play" id="playBtn" title="Play / pause (space)">▶</button>
+        <button class="btn step" id="stepFwd" title="Forward one frame (→ key, or scroll over the video). Hold to repeat.">1 frame ›</button>
+        <button class="btn icon" id="nextPhase" title="Next position (])">⏭</button>
+        <select id="speedSelect" title="Playback speed">
+          <option value="1">1×</option><option value="0.5">½×</option><option value="0.25" selected>¼×</option><option value="0.1">0.1×</option>
+        </select>
+        <label class="chk" title="Loop the swing from address to finish"><input type="checkbox" id="loopSwing" checked /> Loop swing</label>
+        <span class="hint">←/→ or scroll over the video: 1 frame · Shift: 5</span>
+        <span class="readout" id="readout">–</span>
+      </div>
+      <div class="phase-chips" id="phaseChips"></div>
+      <div class="scrub-wrap">
+        <input type="range" id="scrubber" min="0" max="0" value="0" step="1" />
+        <div class="trim" id="trimMarks"></div>
+      </div>
+      <div class="trim-ctrls">
+        <button class="btn ghost small" id="trimIn" title="Start the analysis window at this frame">Set start</button>
+        <button class="btn ghost small" id="trimOut" title="End the analysis window at this frame">Set end</button>
+        <button class="btn ghost small" id="trimClear">Clear window</button>
+        <span class="muted small">Use the window if a clip has a walk-in, replay or second swing.</span>
+      </div>
+    </section>
+
+    <section class="panel charts-panel">
+      <div class="panel-head">
+        <span class="title">Graphs</span>
+        <div class="chips" id="chartChips"></div>
+      </div>
+      <div class="charts" id="charts"></div>
+    </section>
+  </main>
+
+  <div class="dropzone hidden" id="dropzone"><div>Drop the video to analyse it</div></div>
+
+  <div class="modal hidden" id="progressModal">
+    <div class="modal-card">
+      <h3 id="progressTitle">Analysing swing…</h3>
+      <div class="bar"><div id="progressBar"></div></div>
+      <p class="muted" id="progressText">Loading pose model…</p>
+      <button class="btn ghost" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="libraryModal">
+    <div class="modal-card wide">
+      <div class="modal-head"><h3>Swing library</h3><button class="btn ghost" data-close>✕</button></div>
+      <div class="library" id="libraryList"></div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="reportModal">
+    <div class="modal-card wide report">
+      <div class="modal-head"><h3>Swing report</h3><div><button class="btn" id="printReport">Print / PDF</button> <button class="btn ghost" data-close>✕</button></div></div>
+      <div id="reportBody"></div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</body>
+</html>
